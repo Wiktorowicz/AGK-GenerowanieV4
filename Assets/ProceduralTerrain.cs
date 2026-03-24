@@ -1,140 +1,132 @@
 ﻿using UnityEngine;
 
-[RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
-public class ProceduralTerrain : MonoBehaviour
+[RequireComponent(typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider))]
+public class ProceduralTerrainSmooth : MonoBehaviour
 {
     public int width = 200;
     public int depth = 200;
+    public float heightMultiplier = 15f;
+    public float hillFrequency = 0.02f;
 
-    public float heightMultiplier = 6f;
-    public float hillFrequency = 0.03f;
+    [Header("Tekstury")]
+    public Texture2D sandTexture;
+    public Texture2D grassTexture;
+    public Texture2D rockTexture;
+    public Texture2D snowTexture;
+    public float textureScale = 0.05f; // 🔥 lepsze UV
 
-    public float waterLevel = 1.5f;
-    public float textureTiling = 25f;
+    [Header("Progi Wysokości")]
+    public float waterLevel = 2.0f;
+    public float grassLevel = 5.0f;
+    public float rockLevel = 9.0f;
 
-    public Material sandMat;
-    public Material grassMat;
-    public Material rockMat;
-    public Material snowMat;
+    public Material terrainMaterial;
+    private Material internalMat;
 
     void Start()
     {
+        if (terrainMaterial != null)
+        {
+            internalMat = new Material(terrainMaterial);
+            GetComponent<MeshRenderer>().material = internalMat;
+        }
+
         GenerateTerrain();
+        ApplyTextures();
     }
 
     void GenerateTerrain()
     {
         Mesh mesh = new Mesh();
+        mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
 
         Vector3[] vertices = new Vector3[width * depth];
-        Vector2[] uv = new Vector2[vertices.Length];
+        Color[] colors = new Color[vertices.Length];
+        int[] triangles = new int[(width - 1) * (depth - 1) * 6];
 
-        int[] sandTris = new int[(width - 1) * (depth - 1) * 6];
-        int[] grassTris = new int[(width - 1) * (depth - 1) * 6];
-        int[] rockTris = new int[(width - 1) * (depth - 1) * 6];
-        int[] snowTris = new int[(width - 1) * (depth - 1) * 6];
-
-        int s = 0, g = 0, r = 0, sn = 0;
-
-        float[,] heightMap = new float[width, depth];
-
-        // 🔹 HEIGHTMAP (z zagłębieniami)
         for (int z = 0; z < depth; z++)
         {
             for (int x = 0; x < width; x++)
             {
-                float noise = Mathf.PerlinNoise(x * hillFrequency, z * hillFrequency);
+                int i = z * width + x;
 
-                // 🔥 łagodny teren + trochę wyższe górki
-                noise = Mathf.Pow(noise, 2.2f);
+                // 🔥 LEPSZY NOISE (2 warstwy)
+                float n1 = Mathf.PerlinNoise(x * hillFrequency, z * hillFrequency);
+                float n2 = Mathf.PerlinNoise(x * hillFrequency * 2f, z * hillFrequency * 2f) * 0.5f;
 
-                float y = noise * heightMultiplier;
+                float noise = n1 + n2;
 
-                // 🔥 DODATKOWY NOISE NA DOŁKI
-                float holeNoise = Mathf.PerlinNoise(x * 0.08f, z * 0.08f);
-                if (holeNoise < 0.3f)
-                {
-                    y -= 1.2f; // robi zagłębienia
-                }
+                float y = Mathf.Pow(noise, 1.5f) * heightMultiplier;
 
-                heightMap[x, z] = y;
+                vertices[i] = new Vector3(x, y, z);
+
+                // 🔥 KLUCZOWE – NORMALIZOWANE WAGI
+                colors[i] = CalculateWeights(y);
             }
         }
 
-        int vertIndex = 0;
-
-        // 🔹 MESH + BIOMY
-        for (int z = 0; z < depth; z++)
+        int tri = 0;
+        for (int z = 0; z < depth - 1; z++)
         {
-            for (int x = 0; x < width; x++)
+            for (int x = 0; x < width - 1; x++)
             {
-                float y = heightMap[x, z];
-                vertices[vertIndex] = new Vector3(x, y, z);
+                int s = z * width + x;
 
-                uv[vertIndex] = new Vector2(
-                    (float)x / width * textureTiling,
-                    (float)z / depth * textureTiling
-                );
+                triangles[tri++] = s;
+                triangles[tri++] = s + width;
+                triangles[tri++] = s + 1;
 
-                if (x < width - 1 && z < depth - 1)
-                {
-                    int a = vertIndex;
-                    int b = vertIndex + width;
-                    int c = vertIndex + 1;
-                    int d = vertIndex + width + 1;
-
-                    float avgHeight =
-                        (heightMap[x, z] +
-                         heightMap[x + 1, z] +
-                         heightMap[x, z + 1] +
-                         heightMap[x + 1, z + 1]) / 4f;
-
-                    // 🔥 BIOMY
-
-                    if (avgHeight < waterLevel)
-                    {
-                        // 🔹 zagłębienia / jeziora
-                        sandTris[s++] = a; sandTris[s++] = b; sandTris[s++] = c;
-                        sandTris[s++] = c; sandTris[s++] = b; sandTris[s++] = d;
-                    }
-                    else if (avgHeight < 3.5f)
-                    {
-                        // 🔹 dużo trawy
-                        grassTris[g++] = a; grassTris[g++] = b; grassTris[g++] = c;
-                        grassTris[g++] = c; grassTris[g++] = b; grassTris[g++] = d;
-                    }
-                    else if (avgHeight < 5.5f)
-                    {
-                        // 🔹 skały
-                        rockTris[r++] = a; rockTris[r++] = b; rockTris[r++] = c;
-                        rockTris[r++] = c; rockTris[r++] = b; rockTris[r++] = d;
-                    }
-                    else
-                    {
-                        // 🔹 śnieg na topach
-                        snowTris[sn++] = a; snowTris[sn++] = b; snowTris[sn++] = c;
-                        snowTris[sn++] = c; snowTris[sn++] = b; snowTris[sn++] = d;
-                    }
-                }
-
-                vertIndex++;
+                triangles[tri++] = s + 1;
+                triangles[tri++] = s + width;
+                triangles[tri++] = s + width + 1;
             }
         }
 
         mesh.vertices = vertices;
-        mesh.uv = uv;
-
-        mesh.subMeshCount = 4;
-        mesh.SetTriangles(sandTris, 0);
-        mesh.SetTriangles(grassTris, 1);
-        mesh.SetTriangles(rockTris, 2);
-        mesh.SetTriangles(snowTris, 3);
+        mesh.triangles = triangles;
+        mesh.colors = colors;
 
         mesh.RecalculateNormals();
 
         GetComponent<MeshFilter>().mesh = mesh;
+        GetComponent<MeshCollider>().sharedMesh = mesh;
+    }
 
-        GetComponent<MeshRenderer>().materials =
-            new Material[] { sandMat, grassMat, rockMat, snowMat };
+    void ApplyTextures()
+    {
+        if (internalMat == null) return;
+
+        internalMat.SetTexture("_SandTex", sandTexture);
+        internalMat.SetTexture("_GrassTex", grassTexture);
+        internalMat.SetTexture("_RockTex", rockTexture);
+        internalMat.SetTexture("_SnowTex", snowTexture);
+
+        internalMat.SetFloat("_Tiling", textureScale);
+    }
+
+    // 🔥 NAJWAŻNIEJSZA FUNKCJA (NAPRAWIONA)
+    Color CalculateWeights(float y)
+    {
+        // 🔥 wyraźne zakresy wysokości
+        float sand = Mathf.Clamp01((waterLevel - y) * 2f);
+
+        float grass = Mathf.Clamp01(1f - Mathf.Abs(y - grassLevel) / 2f);
+        float rock = Mathf.Clamp01(1f - Mathf.Abs(y - rockLevel) / 2f);
+        float snow = Mathf.Clamp01((y - rockLevel) / 2f);
+
+        // 🔥 bonus: wycinamy słabe wpływy (ważne!)
+        sand = sand < 0.01f ? 0 : sand;
+        grass = grass < 0.01f ? 0 : grass;
+        rock = rock < 0.01f ? 0 : rock;
+        snow = snow < 0.01f ? 0 : snow;
+
+        float sum = sand + grass + rock + snow + 0.0001f;
+
+        return new Color(
+            sand / sum,
+            grass / sum,
+            rock / sum,
+            snow / sum
+        );
     }
 }
