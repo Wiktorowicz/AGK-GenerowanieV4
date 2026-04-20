@@ -76,12 +76,13 @@ public class ProceduralTerrainSmooth : MonoBehaviour
                 float riverX = (width * 0.5f) + Mathf.Sin(z * 0.05f) * 20f;
                 float distToRiver = Mathf.Abs(x - riverX);
 
-                float rzekaPromien = 25f;
+                float riverWidth = 40f;
+                float riverDepth = 8f;
 
-                if (distToRiver < rzekaPromien)
+                if (distToRiver < riverWidth)
                 {
-                    float smoothRiver = Mathf.SmoothStep(rzekaPromien, 0f, distToRiver);
-                    y -= smoothRiver * (waterLevel + 4f);
+                    float t = 1f - (distToRiver / riverWidth);
+                    y -= riverDepth * t;
                 }
 
                 vertices[i] = new Vector3(x, y, z);

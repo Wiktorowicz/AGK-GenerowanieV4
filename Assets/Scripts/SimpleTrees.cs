@@ -28,17 +28,14 @@ public class BiomeSpawner : MonoBehaviour
         float hMul = terrain.GetHeightMultiplier();
         float waterLevel = terrain.waterLevel;
 
-        // 🌲 LOSOWE POŁOŻENIE
         Vector2 forestCenter = new Vector2(
             Random.Range(width * 0.2f, width * 0.8f),
             Random.Range(depth * 0.2f, depth * 0.8f)
         );
 
-        // 🌲 LOSOWA WIELKOŚĆ
         float forestRadius = Random.Range(width * 0.2f, width * 0.45f);
 
-        // 🌲 WIĘCEJ DRZEW
-        int localTreeCount = treeCount * 2; // 🔥 dużo gęściej
+        int localTreeCount = treeCount * 2;
 
         for (int i = 0; i < localTreeCount; i++)
         {
@@ -47,7 +44,6 @@ public class BiomeSpawner : MonoBehaviour
 
             float dist = Vector2.Distance(new Vector2(x, z), forestCenter);
 
-            // 🌲 poszarpany kształt
             float noise = Mathf.PerlinNoise(x * 0.05f, z * 0.05f);
 
             if (dist > forestRadius * (0.6f + noise * 0.7f)) continue;
@@ -62,7 +58,6 @@ public class BiomeSpawner : MonoBehaviour
             CreateTree(new Vector3(x, y, z));
         }
 
-        // 🪨 KAMIENIE (góry)
         for (int i = 0; i < rockCount; i++)
         {
             int x = Random.Range(0, width);
@@ -78,7 +73,6 @@ public class BiomeSpawner : MonoBehaviour
             CreateRock(new Vector3(x, y, z));
         }
 
-        // 🌿 KRZAKI
         for (int i = 0; i < bushCount; i++)
         {
             int x = Random.Range(0, width);
@@ -95,7 +89,6 @@ public class BiomeSpawner : MonoBehaviour
         }
     }
 
-    // 🌲 DRZEWO
     void CreateTree(Vector3 pos)
     {
         float scale = Random.Range(4f, 6f);
@@ -113,7 +106,6 @@ public class BiomeSpawner : MonoBehaviour
         leaves.GetComponent<Renderer>().material.color = Color.green;
     }
 
-    // 🪨 KAMIEŃ
     void CreateRock(Vector3 pos)
     {
         float scale = Random.Range(2f, 4f);
@@ -125,7 +117,6 @@ public class BiomeSpawner : MonoBehaviour
         rock.GetComponent<Renderer>().material.color = Color.gray;
     }
 
-    // 🌿 DUŻE KRZAKI
     void CreateBush(Vector3 pos)
     {
         int parts = Random.Range(6, 10);
