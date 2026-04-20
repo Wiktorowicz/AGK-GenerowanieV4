@@ -24,7 +24,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _GrassTex:
-        m_Texture: {fileID: 2800000, guid: 00b31f0c2ecf70a4e896d360fd496f04, type: 3}
+        m_Texture: {fileID: 2800000, guid: 233b55ce8959d864397779344de401fe, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _RockTex:

@@ -22,7 +22,7 @@ public class ProceduralTerrainSmooth : MonoBehaviour
     public Texture2D grassTexture;
     public Texture2D rockTexture;
     public Texture2D snowTexture;
-    public float textureScale = 0.05f;
+    public float textureScale = 0.5f;
 
     private float[] heights;
     private Vector3[] vertices;
