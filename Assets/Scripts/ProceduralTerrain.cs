@@ -25,8 +25,15 @@ public class ProceduralTerrainSmooth : MonoBehaviour
     public float textureScale = 0.05f;
 
     private float[] heights;
+    private Vector3[] vertices;
 
     void Start() => GenerateTerrain();
+
+    public float[] GetHeights() => heights;
+    public int GetWidth() => width;
+    public int GetDepth() => depth;
+    public float GetHeightMultiplier() => mnoznikWysokosci;
+    public Vector3[] GetVertices() => vertices;
 
     void GenerateTerrain()
     {
@@ -45,8 +52,7 @@ public class ProceduralTerrainSmooth : MonoBehaviour
                 {
                     int idx = z * width + x;
                     Vector2 pos = new Vector2(x - lineX, z - lineZ);
-                    if (Vector2.Dot(pos, lineDir) > 0) heights[idx] += currentDisplacement;
-                    else heights[idx] -= currentDisplacement;
+                    heights[idx] += (Vector2.Dot(pos, lineDir) > 0) ? currentDisplacement : -currentDisplacement;
                 }
             }
             currentDisplacement *= 0.995f;
@@ -57,7 +63,7 @@ public class ProceduralTerrainSmooth : MonoBehaviour
         for (int s = 0; s < smoothIterations; s++) SmoothHeights();
 
         Mesh mesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
-        Vector3[] vertices = new Vector3[width * depth];
+        vertices = new Vector3[width * depth];
         Color[] colors = new Color[vertices.Length];
 
         for (int z = 0; z < depth; z++)
@@ -86,12 +92,19 @@ public class ProceduralTerrainSmooth : MonoBehaviour
         int[] triangles = new int[(width - 1) * (depth - 1) * 6];
         int tri = 0;
         for (int z = 0; z < depth - 1; z++)
+        {
             for (int x = 0; x < width - 1; x++)
             {
                 int s = z * width + x;
-                triangles[tri++] = s; triangles[tri++] = s + width; triangles[tri++] = s + 1;
-                triangles[tri++] = s + 1; triangles[tri++] = s + width; triangles[tri++] = s + width + 1;
+                triangles[tri++] = s;
+                triangles[tri++] = s + width;
+                triangles[tri++] = s + 1;
+
+                triangles[tri++] = s + 1;
+                triangles[tri++] = s + width;
+                triangles[tri++] = s + width + 1;
             }
+        }
 
         mesh.vertices = vertices;
         mesh.triangles = triangles;
@@ -113,6 +126,7 @@ public class ProceduralTerrainSmooth : MonoBehaviour
             if (h < minH) minH = h;
             if (h > maxH) maxH = h;
         }
+
         for (int i = 0; i < heights.Length; i++)
         {
             float normalized = (heights[i] - minH) / (maxH - minH);
@@ -123,17 +137,26 @@ public class ProceduralTerrainSmooth : MonoBehaviour
     void SmoothHeights()
     {
         float[] nh = new float[heights.Length];
+
         for (int z = 1; z < depth - 1; z++)
+        {
             for (int x = 1; x < width - 1; x++)
-                nh[z * width + x] = (heights[(z - 1) * width + x] + heights[(z + 1) * width + x] +
-                                     heights[z * width + x - 1] + heights[z * width + x + 1] + heights[z * width + x]) / 5f;
+            {
+                nh[z * width + x] =
+                    (heights[(z - 1) * width + x] +
+                     heights[(z + 1) * width + x] +
+                     heights[z * width + x - 1] +
+                     heights[z * width + x + 1] +
+                     heights[z * width + x]) / 5f;
+            }
+        }
+
         heights = nh;
     }
 
     Color CalculateWeights(float y, float distToRiver, float h)
     {
         float sand = (y < waterLevel + 1.2f && distToRiver < 18f) ? 1f : 0f;
-
         float snow = (h > 0.75f) ? Mathf.Clamp01((y - 35f) / 10f) : 0f;
         float rock = (h > 0.45f) ? Mathf.Clamp01((y - 20f) / 10f) : 0f;
         float grass = Mathf.Clamp01(1f - (sand + rock + snow));
@@ -145,11 +168,13 @@ public class ProceduralTerrainSmooth : MonoBehaviour
     void ApplyTexturesToMaterial()
     {
         if (!terrainMaterial) return;
+
         terrainMaterial.SetTexture("_SandTex", sandTexture);
         terrainMaterial.SetTexture("_GrassTex", grassTexture);
         terrainMaterial.SetTexture("_RockTex", rockTexture);
         terrainMaterial.SetTexture("_SnowTex", snowTexture);
         terrainMaterial.SetFloat("_Tiling", textureScale);
+
         GetComponent<MeshRenderer>().sharedMaterial = terrainMaterial;
     }
 
@@ -157,10 +182,13 @@ public class ProceduralTerrainSmooth : MonoBehaviour
     {
         GameObject old = GameObject.Find("WaterSurface");
         if (old) DestroyImmediate(old);
+
         GameObject water = GameObject.CreatePrimitive(PrimitiveType.Plane);
         water.name = "WaterSurface";
-        water.transform.position = new Vector3(width / 2f - 0.5f, waterLevel, depth / 2f - 0.5f);
+        water.transform.position = new Vector3(width / 2f, waterLevel, depth / 2f);
         water.transform.localScale = new Vector3(width / 10f, 1, depth / 10f);
-        if (waterMaterial) water.GetComponent<MeshRenderer>().material = waterMaterial;
+
+        if (waterMaterial)
+            water.GetComponent<MeshRenderer>().material = waterMaterial;
     }
 }
