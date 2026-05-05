@@ -1,19 +1,16 @@
 ﻿using UnityEngine;
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer), typeof(MeshCollider))]
-public class ProceduralTerrainSmooth : MonoBehaviour
-{
+public class ProceduralTerrainSmooth : MonoBehaviour {
     public int width = 256;
     public int depth = 256;
 
-    private int iterations = 300;
-    private float initialDisplacement = 2.0f;
-    private float elevationExponent = 3.5f;
-    private int smoothIterations = 4;
+    private int iterations = 200;
+    private float initialDisplacement = 1.2f;
+    private float elevationExponent = 3.0f; 
 
     [Header("Skalowanie")]
-    public float mnoznikWysokosci = 50f;
-
+    public float mnoznikWysokosci = 40f; 
     [Header("Tekstury i Woda")]
     public float waterLevel = 2.0f;
     public Material terrainMaterial;
@@ -33,70 +30,69 @@ public class ProceduralTerrainSmooth : MonoBehaviour
     public int GetWidth() => width;
     public int GetDepth() => depth;
     public float GetHeightMultiplier() => mnoznikWysokosci;
-    public Vector3[] GetVertices() => vertices;
 
-    void GenerateTerrain()
-    {
+    void GenerateTerrain() {
         heights = new float[width * depth];
         float currentDisplacement = initialDisplacement;
 
-        for (int i = 0; i < iterations; i++)
-        {
+        for (int i = 0; i < iterations; i++) {
             float lineX = Random.Range(0, width);
             float lineZ = Random.Range(0, depth);
-            Vector2 lineDir = new Vector2(Random.Range(-1f, 1f), Random.Range(-1f, 1f)).normalized;
+            Vector2 dir = new Vector2(Random.Range(-1f, 1f), Random.Range(-1f, 1f)).normalized;
 
-            for (int z = 0; z < depth; z++)
-            {
-                for (int x = 0; x < width; x++)
-                {
+            for (int z = 0; z < depth; z++) {
+                for (int x = 0; x < width; x++) {
                     int idx = z * width + x;
                     Vector2 pos = new Vector2(x - lineX, z - lineZ);
-                    heights[idx] += (Vector2.Dot(pos, lineDir) > 0) ? currentDisplacement : -currentDisplacement;
+
+                    heights[idx] += (Vector2.Dot(pos, dir) > 0) ? currentDisplacement : -currentDisplacement;
                 }
             }
-            currentDisplacement *= 0.995f;
+
+            currentDisplacement *= 0.99f;
         }
 
         ApplyTerrainShaping();
 
-        for (int s = 0; s < smoothIterations; s++) SmoothHeights();
+        for (int z = 0; z < depth; z++) {
+            for (int x = 0; x < width; x++) {
+                int i = z * width + x;
 
+                float largeNoise = Mathf.PerlinNoise(x * 0.005f, z * 0.005f);
+                heights[i] += largeNoise * 0.5f;
+            }
+        }
+
+        SmoothHeights(1);
+
+        BuildMesh();
+        ApplyTexturesToMaterial();
+        CreateWater();
+    }
+
+    void BuildMesh() {
         Mesh mesh = new Mesh { indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+
         vertices = new Vector3[width * depth];
         Color[] colors = new Color[vertices.Length];
 
-        for (int z = 0; z < depth; z++)
-        {
-            for (int x = 0; x < width; x++)
-            {
+        for (int z = 0; z < depth; z++) {
+            for (int x = 0; x < width; x++) {
                 int i = z * width + x;
                 float y = heights[i] * mnoznikWysokosci;
 
-                float riverX = (width * 0.5f) + Mathf.Sin(z * 0.05f) * 20f;
-                float distToRiver = Mathf.Abs(x - riverX);
-
-                float riverWidth = 40f;
-                float riverDepth = 8f;
-
-                if (distToRiver < riverWidth)
-                {
-                    float t = 1f - (distToRiver / riverWidth);
-                    y -= riverDepth * t;
-                }
-
                 vertices[i] = new Vector3(x, y, z);
-                colors[i] = CalculateWeights(y, distToRiver, heights[i]);
+                colors[i] = CalculateWeights(y, heights[i]);
             }
         }
 
         int[] triangles = new int[(width - 1) * (depth - 1) * 6];
         int tri = 0;
-        for (int z = 0; z < depth - 1; z++)
-        {
-            for (int x = 0; x < width - 1; x++)
-            {
+
+        for (int z = 0; z < depth - 1; z++) {
+            for (int x = 0; x < width - 1; x++) {
                 int s = z * width + x;
+
                 triangles[tri++] = s;
                 triangles[tri++] = s + width;
                 triangles[tri++] = s + 1;
@@ -114,60 +110,56 @@ public class ProceduralTerrainSmooth : MonoBehaviour
 
         GetComponent<MeshFilter>().mesh = mesh;
         GetComponent<MeshCollider>().sharedMesh = mesh;
-
-        ApplyTexturesToMaterial();
-        CreateWater();
     }
 
-    void ApplyTerrainShaping()
-    {
+    void ApplyTerrainShaping() {
         float minH = float.MaxValue, maxH = float.MinValue;
-        foreach (float h in heights)
-        {
+
+        foreach (float h in heights) {
             if (h < minH) minH = h;
             if (h > maxH) maxH = h;
         }
 
-        for (int i = 0; i < heights.Length; i++)
-        {
-            float normalized = (heights[i] - minH) / (maxH - minH);
-            heights[i] = Mathf.Pow(normalized, elevationExponent);
+        for (int i = 0; i < heights.Length; i++) {
+            float n = (heights[i] - minH) / (maxH - minH);
+            heights[i] = Mathf.Pow(n, elevationExponent);
         }
     }
 
-    void SmoothHeights()
-    {
-        float[] nh = new float[heights.Length];
+    void SmoothHeights(int iterations) {
+        for (int it = 0; it < iterations; it++) {
+            float[] newHeights = new float[heights.Length];
 
-        for (int z = 1; z < depth - 1; z++)
-        {
-            for (int x = 1; x < width - 1; x++)
-            {
-                nh[z * width + x] =
-                    (heights[(z - 1) * width + x] +
-                     heights[(z + 1) * width + x] +
-                     heights[z * width + x - 1] +
-                     heights[z * width + x + 1] +
-                     heights[z * width + x]) / 5f;
+            for (int z = 1; z < depth - 1; z++) {
+                for (int x = 1; x < width - 1; x++) {
+                    float sum = 0f;
+
+                    for (int dz = -1; dz <= 1; dz++) {
+                        for (int dx = -1; dx <= 1; dx++) {
+                            int idx = (z + dz) * width + (x + dx);
+                            sum += heights[idx];
+                        }
+                    }
+
+                    newHeights[z * width + x] = sum / 9f;
+                }
             }
-        }
 
-        heights = nh;
+            heights = newHeights;
+        }
     }
 
-    Color CalculateWeights(float y, float distToRiver, float h)
-    {
-        float sand = (y < waterLevel + 1.2f && distToRiver < 18f) ? 1f : 0f;
-        float snow = (h > 0.75f) ? Mathf.Clamp01((y - 35f) / 10f) : 0f;
-        float rock = (h > 0.45f) ? Mathf.Clamp01((y - 20f) / 10f) : 0f;
+    Color CalculateWeights(float y, float h) {
+        float sand = (y < waterLevel + 1.2f) ? 1f : 0f;
+        float snow = (h > 0.75f) ? Mathf.Clamp01((y - 30f) / 10f) : 0f;
+        float rock = (h > 0.45f) ? Mathf.Clamp01((y - 15f) / 10f) : 0f;
         float grass = Mathf.Clamp01(1f - (sand + rock + snow));
 
         float sum = sand + grass + rock + snow + 0.001f;
         return new Color(sand / sum, grass / sum, rock / sum, snow / sum);
     }
 
-    void ApplyTexturesToMaterial()
-    {
+    void ApplyTexturesToMaterial() {
         if (!terrainMaterial) return;
 
         terrainMaterial.SetTexture("_SandTex", sandTexture);
@@ -179,8 +171,7 @@ public class ProceduralTerrainSmooth : MonoBehaviour
         GetComponent<MeshRenderer>().sharedMaterial = terrainMaterial;
     }
 
-    void CreateWater()
-    {
+    void CreateWater() {
         GameObject old = GameObject.Find("WaterSurface");
         if (old) DestroyImmediate(old);
 
@@ -191,5 +182,45 @@ public class ProceduralTerrainSmooth : MonoBehaviour
 
         if (waterMaterial)
             water.GetComponent<MeshRenderer>().material = waterMaterial;
+    }
+
+    public float GetHeightWorld(float worldX, float worldZ) {
+        int x = Mathf.Clamp(Mathf.RoundToInt(worldX), 0, width - 1);
+        int z = Mathf.Clamp(Mathf.RoundToInt(worldZ), 0, depth - 1);
+
+        return heights[z * width + x] * mnoznikWysokosci;
+    }
+
+    public float GetWaterLevel() => waterLevel;
+
+    public void FlattenArea(int centerX, int centerZ, int radius) {
+        float centerHeight = heights[centerZ * width + centerX];
+
+        for (int z = -radius; z <= radius; z++) {
+            for (int x = -radius; x <= radius; x++) {
+                int px = centerX + x;
+                int pz = centerZ + z;
+
+                if (px < 0 || pz < 0 || px >= width || pz >= depth)
+                    continue;
+
+                float dist = Mathf.Sqrt(x * x + z * z);
+                if (dist > radius) continue;
+
+                float t = dist / radius;
+                int idx = pz * width + px;
+
+                heights[idx] = Mathf.Lerp(centerHeight, heights[idx], t);
+            }
+        }
+        SmoothHeights(1);
+        BuildMesh();
+    }
+
+    public float GetNormalizedHeight(float worldX, float worldZ) {
+        int x = Mathf.Clamp(Mathf.RoundToInt(worldX), 0, width - 1);
+        int z = Mathf.Clamp(Mathf.RoundToInt(worldZ), 0, depth - 1);
+
+        return heights[z * width + x];
     }
 }

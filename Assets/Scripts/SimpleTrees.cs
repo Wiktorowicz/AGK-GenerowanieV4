@@ -89,19 +89,18 @@ public class BiomeSpawner : MonoBehaviour
         }
     }
 
-    void CreateTree(Vector3 pos)
-    {
-        float scale = Random.Range(4f, 6f);
+    void CreateTree(Vector3 pos) {
+        float scale = Random.Range(1.5f, 2.5f);
 
         GameObject trunk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         trunk.transform.position = pos + Vector3.up * (1f * scale);
-        trunk.transform.localScale = new Vector3(0.6f, 2f, 0.6f) * scale;
+        trunk.transform.localScale = new Vector3(0.4f, 1.5f, 0.4f) * scale;
         trunk.transform.parent = transform;
         trunk.GetComponent<Renderer>().material.color = new Color(0.4f, 0.25f, 0.1f);
 
         GameObject leaves = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        leaves.transform.position = pos + Vector3.up * (3.5f * scale);
-        leaves.transform.localScale = new Vector3(3f, 3f, 3f) * scale;
+        leaves.transform.position = pos + Vector3.up * (2.5f * scale);
+        leaves.transform.localScale = new Vector3(2f, 2f, 2f) * scale;
         leaves.transform.parent = transform;
         leaves.GetComponent<Renderer>().material.color = Color.green;
     }
@@ -117,25 +116,23 @@ public class BiomeSpawner : MonoBehaviour
         rock.GetComponent<Renderer>().material.color = Color.gray;
     }
 
-    void CreateBush(Vector3 pos)
-    {
-        int parts = Random.Range(6, 10);
-        float baseScale = Random.Range(3.5f, 5f);
+    void CreateBush(Vector3 pos) {
+        int parts = Random.Range(4, 7);
+        float baseScale = Random.Range(1.2f, 2f);
 
         GameObject parent = new GameObject("Bush");
         parent.transform.position = pos;
         parent.transform.parent = transform;
 
-        for (int i = 0; i < parts; i++)
-        {
+        for (int i = 0; i < parts; i++) {
             GameObject part = GameObject.CreatePrimitive(PrimitiveType.Sphere);
 
-            float scale = baseScale * Random.Range(0.7f, 1.4f);
+            float scale = baseScale * Random.Range(0.7f, 1.2f);
 
             Vector3 offset = new Vector3(
-                Random.Range(-1.5f, 1.5f),
-                Random.Range(0f, 1.2f),
-                Random.Range(-1.5f, 1.5f)
+                Random.Range(-0.8f, 0.8f),
+                Random.Range(0f, 0.6f),
+                Random.Range(-0.8f, 0.8f)
             );
 
             part.transform.position = pos + offset;

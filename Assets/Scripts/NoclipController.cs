@@ -6,15 +6,15 @@ public class NoclipController : MonoBehaviour {
     [SerializeField] private Transform cameraTransform;
 
     [Header("Movement")]
-    [SerializeField] private float baseSpeed = 10f;
+    [SerializeField] private float baseSpeed = 50f;
     [SerializeField] private float sprintMultiplier = 2f;
 
     [Header("Mouse Look")]
-    [SerializeField] private float mouseSensitivity = 2f;
+    [SerializeField] private float mouseSensitivity = 4f;
     [SerializeField] private float maxLookAngle = 90f;
 
-    private float rotationX; // lewo/prawo (Player)
-    private float rotationY; // góra/dół (Camera)
+    private float rotationX; 
+    private float rotationY; 
 
     private void Start() {
         Cursor.lockState = CursorLockMode.Locked;
@@ -28,11 +28,9 @@ public class NoclipController : MonoBehaviour {
     private void HandleLook() {
         Vector2 mouseDelta = Mouse.current.delta.ReadValue();
 
-        // poziom → obrót całego obiektu
         rotationX += mouseDelta.x * mouseSensitivity * Time.deltaTime;
         transform.rotation = Quaternion.Euler(0f, rotationX, 0f);
 
-        // pion → tylko kamera
         rotationY -= mouseDelta.y * mouseSensitivity * Time.deltaTime;
         rotationY = Mathf.Clamp(rotationY, -maxLookAngle, maxLookAngle);
 
